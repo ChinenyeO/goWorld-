@@ -1,0 +1,57 @@
+// Exercise: UserService (Protocol Buffers + ConnectRPC)
+//
+// Step 1: define the CreateUserRequest message yourself.
+// The service and Go code generation come in later steps.
+
+syntax = "proto3";
+
+// The package namespaces your messages. The "v1" suffix is a common
+// convention so the API can be versioned later (user.v2, etc.).
+package user.v1;
+
+// Tells protoc-gen-go which Go import path and package name to use
+// when you generate code later. Nothing is generated yet.
+option go_package = "example/goWorld/12_protobuf/gen/user/v1;userv1";
+
+// ---------------------------------------------------------------------------
+// HINT 1:
+// A protobuf message is declared like:
+//
+//   message ExampleRequest {
+//       // fields
+//   } 
+//
+// HINT 2:
+// A string field follows this general syntax:
+//
+//   string field_name = FIELD_NUMBER;
+//
+// Example using unrelated fields:
+//
+//   message CreateProductRequest {
+//       string title = 1;
+//       string sku = 2;
+//   }
+//
+// HINT 3:
+// Field numbers must be unique within a message and typically begin at 1.
+// ---------------------------------------------------------------------------
+
+// TODO: Define CreateUserRequest below.
+//
+// It needs two fields:
+//   - name:  string
+//   - email: string
+
+message CreateUserRequest {
+    string name = 1;
+    string email = 2;
+}
+
+message CreateUserResponse {
+    string id = 1;
+}
+
+service UserService {
+    rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+}

@@ -1,0 +1,11 @@
+version: v2
+clean: true
+plugins:
+  # Go message types (CreateUserRequest, CreateUserResponse)
+  - local: ["go", "tool", "protoc-gen-go"]
+    out: gen
+    opt: paths=source_relative
+  # ConnectRPC client and handler interfaces (UserService)
+  - local: ["go", "tool", "protoc-gen-connect-go"]
+    out: gen
+    opt: paths=source_relative
