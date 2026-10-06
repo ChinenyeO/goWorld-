@@ -1,0 +1,26 @@
+# Local PostgreSQL for development only. The credentials below are not secret.
+#
+# Start:  docker-compose -f 12_protobuf/compose.yaml up -d
+# Stop:   docker-compose -f 12_protobuf/compose.yaml down
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: goworld-postgres
+    environment:
+      POSTGRES_DB: goworld
+      POSTGRES_USER: goworld
+      POSTGRES_PASSWORD: goworld
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - goworld-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U goworld -d goworld"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  goworld-postgres-data:

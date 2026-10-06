@@ -2,7 +2,13 @@ package userservice
 
 import (
 	"context"
+	"errors"
 )
+
+// ErrUserAlreadyExists is returned by UserRepository implementations when a
+// user with the given email already exists. Callers should check for it with
+// errors.Is, since implementations may wrap it.
+var ErrUserAlreadyExists = errors.New("user already exists")
 
 // ---------------------------------------------------------------------------
 // HINT:

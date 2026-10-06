@@ -3,6 +3,7 @@ package userservice
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -139,5 +140,38 @@ func TestCreateUser_RepositoryError(t *testing.T) {
 
 	if !errors.Is(err, sentinelErr) {
 		t.Errorf("expected error to wrap %v, got %v", sentinelErr, err)
+	}
+}
+
+func TestCreateUser_AlreadyExists(t *testing.T) {
+	// Wrapped on purpose: the service must use errors.Is, not ==.
+	repo := &fakeUserRepository{err: fmt.Errorf("insert user: %w", ErrUserAlreadyExists)}
+	service := NewUserService(repo)
+
+	req := connect.NewRequest(&userv1.CreateUserRequest{
+		Name:  "Chinenye",
+		Email: "chinenye@example.com",
+	})
+
+	resp, err := service.CreateUser(context.Background(), req)
+
+	if repo.calls != 1 {
+		t.Errorf("expected repository to be called once, got %d calls", repo.calls)
+	}
+
+	if resp != nil {
+		t.Errorf("expected nil response, got %v", resp)
+	}
+
+	if got := connect.CodeOf(err); got != connect.CodeAlreadyExists {
+		t.Errorf("expected code %v, got %v (err: %v)", connect.CodeAlreadyExists, got, err)
+	}
+
+	var connectErr *connect.Error
+	if !errors.As(err, &connectErr) {
+		t.Fatalf("expected a *connect.Error, got %T (%v)", err, err)
+	}
+	if connectErr.Message() != "user already exists" {
+		t.Errorf("expected message %q, got %q", "user already exists", connectErr.Message())
 	}
 }

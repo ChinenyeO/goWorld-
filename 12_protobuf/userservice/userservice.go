@@ -110,6 +110,10 @@ func (s *UserService) CreateUser(
 		req.Msg.GetEmail(),
 	)
 
+	if errors.Is(err, ErrUserAlreadyExists) {
+		return nil, connect.NewError(connect.CodeAlreadyExists, ErrUserAlreadyExists)
+	}
+
 	if err != nil {
 		return nil, err
 	}
