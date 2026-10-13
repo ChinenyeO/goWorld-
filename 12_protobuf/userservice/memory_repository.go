@@ -40,3 +40,9 @@ func (m *InMemoryUserRepository) CreateUser(
 ) (string, error) {
 	return "user-memory-123", nil
 }
+
+// GetUser always reports ErrUserNotFound, because this repository does not
+// store users.
+func (m *InMemoryUserRepository) GetUser(ctx context.Context, id string) (User, error) {
+	return User{}, ErrUserNotFound
+}

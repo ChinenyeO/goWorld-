@@ -18,3 +18,16 @@ env "local" {
   // (atlas migrate diff / lint). Atlas starts and removes it in Docker.
   dev = "docker://postgres/17/dev?search_path=public"
 }
+
+env "test" {
+  // Database used by the repository integration tests. It must be set
+  // explicitly, so migrating the test database can never touch "local".
+  //   TEST_DATABASE_URL=... atlas migrate apply --env test
+  url = getenv("TEST_DATABASE_URL")
+
+  migration {
+    dir = "file://db/migrations"
+  }
+
+  dev = "docker://postgres/17/dev?search_path=public"
+}

@@ -13,6 +13,8 @@ package user.v1;
 // when you generate code later. Nothing is generated yet.
 option go_package = "example/goWorld/12_protobuf/gen/user/v1;userv1";
 
+import "google/protobuf/timestamp.proto";
+
 // ---------------------------------------------------------------------------
 // HINT 1:
 // A protobuf message is declared like:
@@ -52,6 +54,22 @@ message CreateUserResponse {
     string id = 1;
 }
 
+message User {
+    string id = 1;
+    string name = 2;
+    string email = 3;
+    google.protobuf.Timestamp created_at = 4;
+}
+
+message GetUserRequest {
+    string id = 1;
+}
+
+message GetUserResponse {
+    User user = 1;
+}
+
 service UserService {
     rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+    rpc GetUser(GetUserRequest) returns (GetUserResponse);
 }

@@ -1,7 +1,7 @@
 // Command 12_protobuf runs UserService over HTTP using ConnectRPC.
 //
-// It requires DATABASE_URL to point at PostgreSQL. Run it from the
-// repository root with:
+// It requires DATABASE_URL to point at PostgreSQL; see Config in config.go for
+// the optional DB_* pool settings. Run it from the repository root with:
 //
 //	DATABASE_URL='postgres://goworld:goworld@localhost:5432/goworld?sslmode=disable' go run ./12_protobuf
 package main
@@ -10,7 +10,6 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"example/goWorld/12_protobuf/gen/user/v1/userv1connect"
@@ -45,9 +44,14 @@ import (
 // ---------------------------------------------------------------------------
 
 func main() {
-	databaseURL := os.Getenv("DATABASE_URL")
-	if databaseURL == "" {
-		log.Fatal("DATABASE_URL is not set")
+	cfg, err := loadConfig()
+	if err != nil {
+		log.Fatalf("invalid configuration: %v", err)
+	}
+
+	poolCfg, err := cfg.poolConfig()
+	if err != nil {
+		log.Fatalf("invalid configuration: %v", err)
 	}
 
 	// Startup gets 5 seconds to reach PostgreSQL; requests use their own contexts.
@@ -55,7 +59,7 @@ func main() {
 	defer cancel()
 
 	// One pool for the whole process, shared by every request.
-	pool, err := pgxpool.New(startupCtx, databaseURL)
+	pool, err := pgxpool.NewWithConfig(startupCtx, poolCfg)
 	if err != nil {
 		log.Fatalf("create database pool: %v", err)
 	}
@@ -66,6 +70,9 @@ func main() {
 		pool.Close()
 		log.Fatalf("ping database: %v", err)
 	}
+
+	log.Printf("database pool: max_conns=%d min_conns=%d max_conn_lifetime=%s max_conn_idle_time=%s",
+		poolCfg.MaxConns, poolCfg.MinConns, poolCfg.MaxConnLifetime, poolCfg.MaxConnIdleTime)
 
 	// TODO 1: Create your UserService (from the userservice package).
 	//         Remember that CreateUser has a pointer receiver (*UserService).

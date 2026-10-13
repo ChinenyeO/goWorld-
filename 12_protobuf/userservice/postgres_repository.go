@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -67,4 +69,46 @@ func translateInsertUserError(err error) error {
 	}
 
 	return fmt.Errorf("insert user: %w", err)
+}
+
+// GetUser returns the user with the given ID. IDs that are not valid UUIDs are
+// rejected with ErrInvalidUserID before querying the database.
+func (r *PostgresUserRepository) GetUser(ctx context.Context, id string) (User, error) {
+	var userID pgtype.UUID
+	if err := userID.Scan(id); err != nil {
+		return User{}, fmt.Errorf("get user: %w", ErrInvalidUserID)
+	}
+
+	const query = `
+		SELECT id, name, email, created_at
+		FROM users
+		WHERE id = $1`
+
+	var (
+		gotID     pgtype.UUID
+		name      string
+		email     string
+		createdAt time.Time
+	)
+	if err := r.pool.QueryRow(ctx, query, userID).Scan(&gotID, &name, &email, &createdAt); err != nil {
+		return User{}, translateGetUserError(err)
+	}
+
+	return User{
+		ID:        gotID.String(),
+		Name:      name,
+		Email:     email,
+		CreatedAt: createdAt,
+	}, nil
+}
+
+// translateGetUserError converts PostgreSQL-specific lookup failures into
+// repository errors. A missing row becomes ErrUserNotFound; any other error is
+// wrapped unchanged so it remains inspectable.
+func translateGetUserError(err error) error {
+	if errors.Is(err, pgx.ErrNoRows) {
+		return fmt.Errorf("get user: %w", ErrUserNotFound)
+	}
+
+	return fmt.Errorf("get user: %w", err)
 }
