@@ -1,0 +1,30 @@
+# The build context is the repository root (the Go module root), but the only
+# image built from it is 12_protobuf. Ignore everything, then allow back just
+# what that build needs, so new files never enter the context by accident.
+*
+!go.mod
+!go.sum
+!12_protobuf/
+
+# Within the allowed paths, still exclude local and sensitive files.
+**/.git
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/.idea
+**/.vscode
+**/*.swp
+**/.DS_Store
+**/*.log
+**/*.test
+**/*.out
+12_protobuf/12_protobuf
+12_protobuf/bin/
+12_protobuf/tmp/
+
+# Not needed to compile the server binary.
+12_protobuf/Dockerfile
+12_protobuf/compose.yaml
+12_protobuf/atlas.hcl
+12_protobuf/db/
