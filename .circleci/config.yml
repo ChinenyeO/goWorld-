@@ -1,0 +1,141 @@
+# CI for the 12_protobuf UserService.
+#
+#   test ─────────────┐
+#                     ├── docker-build
+#   integration-test ─┘
+#
+# Checks are scoped to ./12_protobuf/...: the repository also holds the
+# week 1 exercises, which are not part of this service.
+#
+# Nothing is pushed or deployed. All credentials below belong to the
+# throwaway PostgreSQL container that exists only for the job's lifetime.
+
+version: 2.1
+
+jobs:
+  test:
+    docker:
+      # Matches the "go" directive in go.mod and the Dockerfile's builder.
+      - image: cimg/go:1.26.2
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - go-mod-v1-{{ checksum "go.sum" }}
+      - run:
+          name: Download Go modules
+          command: go mod download
+      - save_cache:
+          key: go-mod-v1-{{ checksum "go.sum" }}
+          paths:
+            - ~/go/pkg/mod
+      - run:
+          name: Verify gofmt
+          command: |
+            unformatted=$(gofmt -l 12_protobuf)
+            if [ -n "$unformatted" ]; then
+              echo "These files are not gofmt-formatted:"
+              echo "$unformatted"
+              exit 1
+            fi
+      - run:
+          name: go vet
+          command: go vet ./12_protobuf/...
+      - run:
+          name: Unit tests
+          # TEST_DATABASE_URL is unset here, so integration tests skip.
+          command: go test -race ./12_protobuf/...
+
+  integration-test:
+    docker:
+      - image: cimg/go:1.26.2
+      # Secondary containers share the primary's network: reachable on localhost.
+      - image: postgres:17
+        environment:
+          POSTGRES_USER: goworld
+          POSTGRES_PASSWORD: goworld
+          POSTGRES_DB: goworld_test
+    environment:
+      # Deliberately TEST_DATABASE_URL, never DATABASE_URL.
+      TEST_DATABASE_URL: postgres://goworld:goworld@localhost:5432/goworld_test?sslmode=disable
+      ATLAS_VERSION: v1.3.0
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - go-mod-v1-{{ checksum "go.sum" }}
+      - run:
+          name: Download Go modules
+          command: go mod download
+      - save_cache:
+          key: go-mod-v1-{{ checksum "go.sum" }}
+          paths:
+            - ~/go/pkg/mod
+      - run:
+          name: Install pg_isready
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends postgresql-client
+      - run:
+          name: Install Atlas
+          # Pinned community build; ATLAS_VERSION is read by the installer.
+          command: curl -sSf https://atlasgo.sh | sh -s -- --community -y
+      - run:
+          name: Wait for PostgreSQL
+          command: |
+            for _ in $(seq 1 60); do
+              if pg_isready -h localhost -p 5432 -U goworld -d goworld_test; then
+                exit 0
+              fi
+              sleep 1
+            done
+            echo "PostgreSQL did not become ready within 60s"
+            exit 1
+      - run:
+          name: Apply Atlas migrations
+          working_directory: ~/project/12_protobuf
+          command: atlas migrate apply --env test
+      - run:
+          name: PostgreSQL integration tests
+          # The tests skip (and pass) if TEST_DATABASE_URL is missing, so a
+          # skip is treated as a failure here.
+          command: |
+            go test -count=1 -race -run '^TestIntegration' -v ./12_protobuf/userservice | tee integration.out
+            if grep -q -- '--- SKIP' integration.out; then
+              echo "Integration tests were skipped; TEST_DATABASE_URL is not reaching them"
+              exit 1
+            fi
+
+  docker-build:
+    docker:
+      - image: cimg/base:current
+    steps:
+      - checkout
+      # The Docker daemon runs in a separate remote environment.
+      - setup_remote_docker
+      - run:
+          name: Build image
+          command: |
+            docker build \
+              -f 12_protobuf/Dockerfile \
+              -t "goworld-userservice:${CIRCLE_SHA1}" \
+              .
+      - run:
+          name: Check image
+          command: |
+            user=$(docker image inspect -f '{{.Config.User}}' "goworld-userservice:${CIRCLE_SHA1}")
+            echo "Image user: $user"
+            case "$user" in
+              ""|root|0|0:*|root:*) echo "Image must not run as root"; exit 1 ;;
+            esac
+            docker image ls "goworld-userservice:${CIRCLE_SHA1}"
+
+workflows:
+  ci:
+    jobs:
+      - test
+      - integration-test
+      - docker-build:
+          requires:
+            - test
+            - integration-test
